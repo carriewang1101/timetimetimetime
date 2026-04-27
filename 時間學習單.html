@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時光小隊：引導練習版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Quicksand:wght@700&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            background: #f0f9ff;
+            touch-action: manipulation;
+        }
+
+        /* 簡報樣式 */
+        .slide-container {
+            width: 100vw; height: 100vh; position: fixed;
+            top: 0; left: 0; z-index: 50; background: #0f172a;
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+
+        .slide {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; visibility: hidden; transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 40px; box-sizing: border-box;
+        }
+
+        .slide.active { opacity: 1; visibility: visible; transform: translateX(0); }
+        .slide.next { transform: translateX(100%); }
+        .slide.prev { transform: translateX(-100%); }
+
+        .nav-btn {
+            position: fixed; bottom: 30px; z-index: 100;
+            background: #334155; border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white; padding: 12px 24px; border-radius: 16px;
+            cursor: pointer; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        #prevBtn { right: 160px; }
+        #nextBtn { right: 40px; }
+
+        /* 拼圖實作樣式 */
+        .planner-container { min-height: 100vh; padding: 2rem; display: none; opacity: 0; transition: opacity 0.5s; }
+        .task-item { cursor: grab; user-select: none; transition: transform 0.2s; touch-action: none; margin-bottom: 8px; }
+        .task-item:active { cursor: grabbing; transform: scale(1.05); }
+        .drop-zone { min-height: 50px; transition: background 0.3s; border-radius: 1rem; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+        .drop-zone.drag-over { background-color: #e0f2fe; border-color: #3b82f6; }
+        
+        .portal-btn {
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: white; padding: 24px 60px; border-radius: 30px;
+            font-size: 28px; font-weight: 900; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        #portalOverlay {
+            position: fixed; inset: 0; background: #fbbf24; z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+            border-radius: 50%; transform: scale(0);
+        }
+
+        @keyframes portalExpand {
+            0% { transform: scale(0); border-radius: 50%; }
+            100% { transform: scale(4); border-radius: 0%; }
+        }
+
+        .sleep-zone {
+            background: linear-gradient(to right, #1e293b, #334155);
+            color: white; border-radius: 1.5rem; padding: 1.5rem;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            border: 2px dashed #64748b;
+        }
+
+        .dragging-active { opacity: 0.5; transform: scale(0.9); }
+
+        /* 日誌輸入框樣式 */
+        .log-input-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px;
+            background: white; padding: 16px; border-radius: 20px; border: 2px solid #e2e8f0;
+        }
+        .log-input-row input {
+            border: none; background: #f1f5f9; padding: 6px 12px; border-radius: 10px;
+            font-weight: bold; color: #1e293b; outline: none; border-bottom: 2px solid #cbd5e1;
+        }
+        .log-input-row input:focus { background: #e2e8f0; border-bottom-color: #3b82f6; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 簡報部分 -->
+    <div class="slide-container" id="slideContainer">
+        <div class="slide bg-slate-900 active overflow-hidden">
+            <div class="z-10 text-center">
+                <div class="text-8xl mb-8">🧑‍🚀</div>
+                <h1 class="text-7xl font-black text-white mb-4 tracking-tighter">時光冒險者：啟動！</h1>
+                <p class="text-2xl font-bold text-slate-400">登陸 16:00 點後的放學星系</p>
+                <p class="mt-16 text-slate-500 font-bold animate-pulse">按 [ 下一頁 ] 進入任務簡報</p>
+            </div>
+        </div>
+
+        <div class="slide bg-white">
+            <div class="max-w-4xl w-full">
+                <div class="text-center mb-12">
+                    <h2 class="text-5xl font-black text-slate-800 mb-2">冒險指令</h2>
+                    <p class="text-slate-400 text-lg font-bold">練習說出你的時間計畫！</p>
+                </div>
+                <div class="grid grid-cols-2 gap-8">
+                    <div class="p-8 rounded-[2.5rem] bg-amber-50 border-4 border-amber-100 text-center">
+                        <div class="text-6xl mb-4">📢</div>
+                        <h3 class="text-3xl font-black text-amber-600 mb-2">練習說理由</h3>
+                        <p class="text-slate-600 font-bold text-xl">為什麼要在這時間做？</p>
+                        <p class="text-slate-500 mt-2 font-bold">練習表達你的想法</p>
+                    </div>
+                    <div class="p-8 rounded-[2.5rem] bg-indigo-50 border-4 border-indigo-100 text-center">
+                        <div class="text-6xl mb-4">🌌</div>
+                        <h3 class="text-3xl font-black text-indigo-600 mb-2">準時登出</h3>
+                        <p class="text-slate-600 font-bold text-xl">21:30 必須存檔</p>
+                        <p class="text-slate-500 mt-2 font-bold">這是不變的冒險準則</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="slide bg-slate-900">
+            <div class="text-center z-10">
+                <div class="mb-8 text-7xl">🕹️</div>
+                <h2 class="text-5xl font-black text-white mb-6">準備好了嗎？</h2>
+                <button onclick="switchToPlanner()" class="portal-btn">繪製精準地圖 ➔</button>
+            </div>
+        </div>
+
+        <button class="nav-btn" id="prevBtn">上一頁</button>
+        <button class="nav-btn" id="nextBtn">下一頁</button>
+    </div>
+
+    <div id="portalOverlay"></div>
+
+    <!-- 2. 實作部分 (拼圖) -->
+    <div class="planner-container" id="plannerContainer">
+        <div class="max-w-6xl mx-auto">
+            <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <div>
+                    <h1 class="text-4xl font-black text-slate-800">精準冒險地圖</h1>
+                    <button onclick="switchToSlides()" class="text-blue-500 font-bold hover:underline">← 重新查看指令</button>
+                </div>
+                <div class="bg-white px-6 py-2 rounded-2xl shadow-sm font-bold text-slate-500 border border-slate-200">
+                    時段：16:00 ~ 21:30 (每 30 分鐘為一格)
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
+                <!-- 任務方塊庫 -->
+                <div class="lg:col-span-4">
+                    <div class="bg-white p-6 rounded-[2.5rem] shadow-xl lg:sticky lg:top-8 overflow-y-auto max-h-[80vh]">
+                        <h2 class="text-xl font-black mb-6">任務方塊</h2>
+                        
+                        <div class="mb-6">
+                            <h3 class="text-xs font-black text-amber-500 uppercase tracking-widest mb-3">學業任務</h3>
+                            <div class="grid grid-cols-1 gap-2">
+                                <div draggable="true" class="task-item p-3 bg-amber-50 border-2 border-amber-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">寫學校功課</span>
+                                </div>
+                                <div draggable="true" class="task-item p-3 bg-amber-50 border-2 border-amber-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">複習功課</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="text-xs font-black text-indigo-500 uppercase tracking-widest mb-3">才藝練習</h3>
+                            <div class="grid grid-cols-1 gap-2">
+                                <div draggable="true" class="task-item p-3 bg-indigo-50 border-2 border-indigo-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">練鋼琴</span>
+                                </div>
+                                <div draggable="true" class="task-item p-3 bg-indigo-50 border-2 border-indigo-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">畫畫</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="text-xs font-black text-blue-500 uppercase tracking-widest mb-3">生活作息</h3>
+                            <div class="grid grid-cols-1 gap-2">
+                                <div draggable="true" class="task-item p-3 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">吃晚餐</span>
+                                </div>
+                                <div draggable="true" class="task-item p-3 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">洗澡</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="text-xs font-black text-green-500 uppercase tracking-widest mb-3">休息時間</h3>
+                            <div class="grid grid-cols-1 gap-2">
+                                <div draggable="true" class="task-item p-3 bg-green-50 border-2 border-green-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">自由時間</span>
+                                </div>
+                                <div draggable="true" class="task-item p-3 bg-green-50 border-2 border-green-200 rounded-xl flex items-center gap-3">
+                                    <span class="font-bold text-slate-700">看書</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 規劃區 -->
+                <div class="lg:col-span-8">
+                    <div class="bg-white p-6 md:p-8 rounded-[3rem] shadow-xl">
+                        <div class="space-y-2 mb-10" id="timeSlotsContainer"></div>
+                        
+                        <div class="flex gap-4 items-center pt-4 mb-10">
+                            <span class="text-indigo-400 font-black w-16 text-right">21:30</span>
+                            <div class="sleep-zone flex-1 font-black">存檔並休息</div>
+                        </div>
+
+                        <button onclick="showLogBuilder()" class="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-2xl shadow-xl hover:bg-indigo-500 transition-all active:scale-95 mb-4">
+                            準備說出我的日誌
+                        </button>
+
+                        <!-- 日誌填空區 -->
+                        <div id="logBuilder" class="mt-8 p-6 bg-slate-50 rounded-[2rem] border-4 border-indigo-100 hidden">
+                            <h3 class="text-2xl font-black text-slate-800 mb-2">任務動機填寫</h3>
+                            <p class="text-slate-500 font-bold mb-6">請在括號內填入為什麼要這樣安排：</p>
+                            <div id="logInputsContainer" class="space-y-3"></div>
+                            <button onclick="finalizeLog()" class="w-full mt-6 bg-slate-800 text-white py-4 rounded-2xl font-black text-xl">
+                                生成最終說法
+                            </button>
+                        </div>
+
+                        <!-- 最終日誌輸出 -->
+                        <div id="finalOutput" class="mt-8 p-8 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-[2.5rem] border-2 border-indigo-200 hidden shadow-inner">
+                            <h3 class="font-black text-slate-700 mb-6 flex justify-between items-center">
+                                <span class="text-xl">我的口語練習日誌：</span>
+                                <button onclick="copyFinalText()" class="text-white bg-indigo-500 px-6 py-2 rounded-xl text-sm font-black shadow-lg">複製文字</button>
+                            </h3>
+                            <div id="finalText" class="whitespace-pre-wrap font-bold text-slate-700 leading-relaxed text-lg bg-white p-8 rounded-3xl border border-indigo-100 shadow-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const times = [];
+        for (let h = 16; h < 21; h++) {
+            times.push(`${h}:00`);
+            times.push(`${h}:30`);
+        }
+        times.push("21:00");
+
+        let currentSlide = 0;
+        let draggedElement = null;
+
+        const container = document.getElementById('timeSlotsContainer');
+        times.forEach((time, index) => {
+            const row = document.createElement('div');
+            row.className = "flex gap-4 items-start";
+            row.innerHTML = `
+                <span class="text-slate-400 font-bold pt-2 w-16 text-right text-sm">${time}</span>
+                <div class="drop-zone border-2 border-dashed border-slate-100 rounded-2xl p-2 flex-1 min-h-[44px]" data-time="${time}"></div>
+            `;
+            container.appendChild(row);
+        });
+
+        function updateSlides() {
+            const slides = document.querySelectorAll('.slide');
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active', 'prev', 'next');
+                if (index === currentSlide) slide.classList.add('active');
+                else if (index < currentSlide) slide.classList.add('prev');
+                else slide.classList.add('next');
+            });
+            document.getElementById('nextBtn').style.display = (currentSlide === 2) ? 'none' : 'block';
+            document.getElementById('prevBtn').style.display = (currentSlide === 0) ? 'none' : 'block';
+        }
+
+        document.getElementById('nextBtn').addEventListener('click', () => { if (currentSlide < 2) { currentSlide++; updateSlides(); } });
+        document.getElementById('prevBtn').addEventListener('click', () => { if (currentSlide > 0) { currentSlide--; updateSlides(); } });
+
+        function switchToPlanner() {
+            const overlay = document.getElementById('portalOverlay');
+            overlay.style.display = 'flex'; overlay.style.animation = 'portalExpand 1s forwards';
+            setTimeout(() => {
+                document.getElementById('slideContainer').style.display = 'none';
+                document.getElementById('plannerContainer').style.display = 'block';
+                setTimeout(() => { document.getElementById('plannerContainer').style.opacity = '1'; }, 50);
+                overlay.style.display = 'none';
+                initDragAndDrop();
+            }, 800);
+        }
+
+        function switchToSlides() {
+            document.getElementById('slideContainer').style.display = 'block';
+            document.getElementById('plannerContainer').style.display = 'none';
+        }
+
+        function initDragAndDrop() {
+            const items = document.querySelectorAll('.task-item');
+            const zones = document.querySelectorAll('.drop-zone');
+
+            items.forEach(item => {
+                item.addEventListener('dragstart', function() { draggedElement = this; this.classList.add('dragging-active'); });
+                item.addEventListener('dragend', function() { this.classList.remove('dragging-active'); });
+                item.addEventListener('touchstart', function() { draggedElement = this; this.classList.add('dragging-active'); }, {passive: true});
+                item.addEventListener('touchend', function(e) {
+                    this.classList.remove('dragging-active');
+                    const touch = e.changedTouches[0];
+                    const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.drop-zone');
+                    if (target) handleDrop(target);
+                });
+            });
+
+            zones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('bg-blue-50', 'border-blue-300'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('bg-blue-50', 'border-blue-300'));
+                zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('bg-blue-50', 'border-blue-300'); handleDrop(zone); });
+            });
+        }
+
+        function handleDrop(zone) {
+            if (draggedElement) {
+                const clone = draggedElement.cloneNode(true);
+                clone.classList.remove('dragging-active');
+                clone.classList.add('text-sm', 'py-1', 'px-3');
+                clone.onclick = () => clone.remove();
+                zone.appendChild(clone);
+            }
+        }
+
+        function showLogBuilder() {
+            const zones = document.querySelectorAll('.drop-zone');
+            const builder = document.getElementById('logBuilder');
+            const inputsContainer = document.getElementById('logInputsContainer');
+            inputsContainer.innerHTML = '';
+            
+            let count = 0;
+            zones.forEach((zone, index) => {
+                const tasks = zone.querySelectorAll('.task-item');
+                if (tasks.length > 0) {
+                    const startTime = zone.getAttribute('data-time');
+                    const nextTime = times[index + 1] || "21:30";
+                    tasks.forEach(t => {
+                        const taskName = t.querySelector('span').innerText;
+                        const row = document.createElement('div');
+                        row.className = "log-input-row";
+                        row.innerHTML = `
+                            <span>我從</span>
+                            <span class="text-indigo-600 font-bold">${startTime}</span>
+                            <span>到</span>
+                            <span class="text-indigo-600 font-bold">${nextTime}</span>
+                            <span>要做</span>
+                            <b class="text-slate-800 underline">${taskName}</b>
+                            <span>，因為我</span>
+                            <input type="text" class="reason-val flex-1 min-w-[200px]" placeholder="想先完成功課才能放鬆">
+                        `;
+                        inputsContainer.appendChild(row);
+                        count++;
+                    });
+                }
+            });
+
+            if (count === 0) {
+                alert("請先把任務方塊放進時間格子裡。");
+                return;
+            }
+            builder.classList.remove('hidden');
+            builder.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function finalizeLog() {
+            const rows = document.querySelectorAll('.log-input-row');
+            let finalStr = "這是我今天的冒險規劃：\n\n";
+            
+            rows.forEach((row) => {
+                const startTime = row.querySelectorAll('.text-indigo-600')[0].innerText;
+                const endTime = row.querySelectorAll('.text-indigo-600')[1].innerText;
+                const task = row.querySelector('b').innerText;
+                const reason = row.querySelector('.reason-val').value || "(尚未填寫原因)";
+                
+                finalStr += `我從 ${startTime} 到 ${endTime} 的時候要做「${task}」，因為我${reason}。\n`;
+            });
+
+            finalStr += "\n我會在 21:30 準時完成所有任務並休息。";
+            
+            document.getElementById('finalOutput').classList.remove('hidden');
+            document.getElementById('finalText').innerText = finalStr;
+            document.getElementById('finalOutput').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function copyFinalText() {
+            const text = document.getElementById('finalText').innerText;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            const btn = document.querySelector('button[onclick="copyFinalText()"]');
+            btn.innerText = "複製成功";
+            setTimeout(() => { btn.innerText = "複製文字"; }, 2000);
+        }
+
+        updateSlides();
+    </script>
+</body>
+</html>
